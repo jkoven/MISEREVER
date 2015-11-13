@@ -27,7 +27,9 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import static org.apache.lucene.queryparser.classic.QueryParserBase.OR_OPERATOR;
 import org.apache.lucene.search.Collector;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.NumericRangeQuery;
@@ -58,7 +60,7 @@ public class SearchCollector extends Collector {
     private static HashMap<Integer, Double> emailWeights;
     public static double tfHigh = 0;
     public static double tfLow = Double.MAX_VALUE;
-    CharArraySet stopWords;
+    public static CharArraySet stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
 
     public SearchCollector(int size) {
         docIds = new BitSet(size);
@@ -321,6 +323,59 @@ public class SearchCollector extends Collector {
 
             SearchFiles.getCollection(masterIndexReader, q, sc);
 //            System.out.println(term + " " + sc.docIds.cardinality());
+            masterIndexReader.close();
+            masterIndexReader = null;
+        } catch (Exception e) {
+            System.err.println("Caught exception in getmaster " + e);
+            e.printStackTrace();
+        }
+    }
+
+    public void multiFieldSearch(String[] fields, String terms) {
+        if (terms.trim().equals("")) {
+            return;
+        }
+        if (stopWords == null) {
+            BufferedReader inFile = null;
+            stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
+            try {
+                File file = new File("./datafiles/stopwords_en.txt");
+                inFile = new BufferedReader(new FileReader(file));
+                String word;
+                while ((word = inFile.readLine()) != null) {
+                    stopWords.add(word.trim());
+                }
+                inFile.close();
+            } catch (FileNotFoundException ex) {
+                Logger.getLogger(SearchCollector.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (IOException ex) {
+                Logger.getLogger(SearchCollector.class.getName()).log(Level.SEVERE, null, ex);
+            } finally {
+                try {
+                    inFile.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(SearchCollector.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+        if (masterIndexReader == null) {
+            try {
+                masterIndexReader = DirectoryReader.open(FSDirectory.open(new File(masterIndexPath)));
+            } catch (IOException ex) {
+                System.err.println(SearchCollector.class.getName() + " " + ex);
+            }
+        }
+        MultiFieldQueryParser mParser
+                = new MultiFieldQueryParser(Version.LUCENE_40, fields,
+                        new ClassicAnalyzer(Version.LUCENE_40, SearchCollector.stopWords));
+        mParser.setDefaultOperator(OR_OPERATOR);
+        try {
+//            System.out.println(qString);
+            Query q = mParser.parse(terms);
+//            System.out.println(q.toString());
+
+            SearchFiles.getCollection(masterIndexReader, q, this);
+//            System.out.println(this.docIds.cardinality());
             masterIndexReader.close();
             masterIndexReader = null;
         } catch (Exception e) {

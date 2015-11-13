@@ -70,4 +70,10 @@
     nbproject/build-impl.xml file. 
 
     -->
+    <target name="-post-jar"> 
+        <mkdir dir="${dist.dir}/datafiles"/>
+        <copy todir="${dist.dir}/datafiles">
+            <fileset dir="datafiles"/>
+        </copy> 
+    </target> 
 </project>
