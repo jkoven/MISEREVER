@@ -9,6 +9,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.BitSet;
 import javax.json.Json;
+import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonBuilderFactory;
 import javax.json.JsonObject;
@@ -28,11 +29,22 @@ public class ClusterSearch {
         this.indexDirectory = indexDirectory;
     }
 
-    public JsonObject clusterSearch(String searchString, String searchRange) {
+    public JsonObject clusterSearch(JsonObject jIn) {
+        
         SearchCollector sc = new SearchCollector();
         sc.masterIndexPath = new File(indexDirectory, "index").toString();
         String[] fields = {"Subject", "contents"};
-        sc.multiFieldSearch(fields, searchString);
+        if (jIn.containsKey("searchString")){
+                    sc.multiFieldSearch(fields, jIn.getString("searchString"));
+        } else {
+            if (jIn.containsKey("emails")){
+                sc.docIds.clear();
+                JsonArray emails = jIn.getJsonArray("emails");
+                for (int i = 0; i < emails.size(); i++){
+                    sc.docIds.set(Integer.parseInt(emails.getString(i)));
+                }
+            }
+        }
         ArrayList<ScTermData> tdl = sc.getExpansionTerms("contents", 100, new BitSet());
         JsonBuilderFactory jFactory = Json.createBuilderFactory(jMap);
         JsonArrayBuilder jTerms = jFactory.createArrayBuilder();

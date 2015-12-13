@@ -19,6 +19,7 @@ public class ScTermData implements Comparable {
     public boolean tfIdfSet;
     public SearchCollector sc;
     public BitSet emails;
+    public int group;
 
     public ScTermData(String term, long freq) {
         this.term = term;
@@ -27,6 +28,7 @@ public class ScTermData implements Comparable {
         this.tfIdfSet = false;
         this.emails = new BitSet();
         sc = null;
+        group = 0;
     }
     public ScTermData(String term, long freq, int e) {
         this.term = term;

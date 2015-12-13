@@ -7,6 +7,7 @@ package miserever;
 
 import java.awt.Component;
 import java.awt.HeadlessException;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -37,6 +38,8 @@ import javax.json.JsonWriterFactory;
 import javax.json.stream.JsonGenerator;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
+import static miserever.CommandHandler.jMap;
+import static miserever.CommandHandler.topUsersList;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -247,6 +250,58 @@ public class FileUtils {
             boolean merge = true;
             boolean headers = false;
             return (EmailContentServer.saveSelected(emailInfo, fc.getSelectedFile(), merge, headers));
+        } catch (IOException ex) {
+            Logger.getLogger(FileUtils.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return ("Files not Saved");
+    }
+    public String saveJsonData(JsonObject jList) {
+        try {
+            JFileChooser fc;
+            if (baseDir == null) {
+                fc = new JFileChooser() {
+
+                    @Override
+                    protected JDialog createDialog(Component parent)
+                            throws HeadlessException {
+                        JDialog dialog = super.createDialog(parent);
+                        // config here as needed - just to see a difference
+                        dialog.setLocationByPlatform(true);
+                        // might help - can't know because I can't reproduce the problem
+                        dialog.setAlwaysOnTop(true);
+                        return dialog;
+                    }
+
+                };
+            } else {
+                fc = new JFileChooser(baseDir) {
+
+                    @Override
+                    protected JDialog createDialog(Component parent)
+                            throws HeadlessException {
+                        JDialog dialog = super.createDialog(parent);
+                        // config here as needed - just to see a difference
+                        dialog.setLocationByPlatform(true);
+                        // might help - can't know because I can't reproduce the problem
+                        dialog.setAlwaysOnTop(true);
+                        return dialog;
+                    }
+
+                };
+            }
+            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fc.setDialogType(JFileChooser.SAVE_DIALOG);
+            fc.grabFocus();
+            int resultVal = fc.showSaveDialog(null);
+            if (resultVal != JFileChooser.APPROVE_OPTION) {
+                return ("Selection not saved");
+            }
+            OutputStream sout = new FileOutputStream(fc.getSelectedFile());
+            JsonWriterFactory jwf = Json.createWriterFactory(jMap);
+            JsonWriter jsonWriter = jwf.createWriter(sout);
+            jsonWriter.writeObject(jList);
+            jsonWriter.close();
+            return (fc.getSelectedFile().toString());
         } catch (IOException ex) {
             Logger.getLogger(FileUtils.class.getName()).log(Level.SEVERE, null, ex);
         }

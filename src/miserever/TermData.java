@@ -16,11 +16,13 @@ public class TermData implements Comparable {
     public double tfIdf;
     public boolean tfIdfSet;
     public SearchCollector sc;
+    public int group;
 
     public TermData(String term, long freq) {
         this.term = term;
         this.freq = freq;
         sc = null;
+        group = 0;
     }
     
     

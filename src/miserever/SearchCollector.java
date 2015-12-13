@@ -524,7 +524,7 @@ public class SearchCollector extends Collector {
             termMaps.put(field, termMap);
             mappedEmails.put(field, (BitSet) docIds.clone());
             totalFreqs.put(field, totalTermFreq);
-            termList = sortTermMap(termMap, tagged, field, totalTermFreq);
+            termList = sortTermMap(termMap, tagged, totalTermFreq);
             if (termList.size() > count) {
                 for (int i = termList.size() - 1; i >= count; i--) {
                     termList.remove(i);
@@ -572,7 +572,62 @@ public class SearchCollector extends Collector {
                     }
                 }
             }
-            termList = sortTermMap(termMap, tagged, field, totalTermFreq);
+            termList = sortTermMap(termMap, tagged, totalTermFreq);
+            if (termList.size() > count) {
+                for (int i = termList.size() - 1; i >= count; i--) {
+                    termList.remove(i);
+                }
+            }
+        } catch (IOException ex) {
+            System.err.println(SearchCollector.class
+                    .getName().toString() + " " + ex);
+        }
+        return (termList);
+    }
+
+    public synchronized ArrayList<ScTermData> getExpansionTermsMultiField(String[] fields, int count, BitSet tagged) {
+        HashMap<String, ScTermData> termMap = new HashMap<String, ScTermData>();
+        ArrayList<ScTermData> termList = null;
+        try {
+            long totalTermFreq = 0;
+            for (int i = docIds.nextSetBit(0); i >= 0;
+                    i = docIds.nextSetBit(i + 1)) {
+                // operate on index i here
+                if (masterIndexReader == null) {
+                    try {
+                        masterIndexReader = DirectoryReader.open(FSDirectory.open(new File(masterIndexPath)));
+                    } catch (IOException ex) {
+                        System.err.println(SearchCollector.class.getName() + " " + ex);
+                    }
+                }
+                int group = 0;
+                for (String field : fields) {
+                    Terms tv = masterIndexReader.getTermVector(i, field);
+                    if (tv == null) {
+                        continue;
+                    }
+                    TermsEnum termsEnum = tv.iterator(null);
+                    BytesRef text;
+                    while ((text = termsEnum.next()) != null) {
+                        String term = text.utf8ToString();
+                        long freq = termsEnum.totalTermFreq();
+                        totalTermFreq += freq;
+                        if (termMap.containsKey(term)) {
+                            ScTermData t = termMap.get(term);
+                            t.freq += freq;
+                            t.totalDocFreq++;
+                            t.group = group;
+                            termMap.put(term, t);
+                        } else {
+                            ScTermData std = new ScTermData(term, freq);
+                            std.group = group;
+                            termMap.put(term, std);
+                        }
+                    }
+                    group++;
+                }
+            }
+            termList = sortTermMap(termMap, tagged, totalTermFreq);
             if (termList.size() > count) {
                 for (int i = termList.size() - 1; i >= count; i--) {
                     termList.remove(i);
@@ -586,7 +641,7 @@ public class SearchCollector extends Collector {
     }
 
     private ArrayList<ScTermData> sortTermMap(HashMap<String, ScTermData> termMap,
-            BitSet tagged, String field, long totalTermFreq) {
+            BitSet tagged, long totalTermFreq) {
         ArrayList<ScTermData> termList = new ArrayList<>();
         for (String key : termMap.keySet()) {
             try {

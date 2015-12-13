@@ -13,7 +13,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
-import java.math.BigDecimal;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.security.Timestamp;
@@ -221,7 +220,7 @@ public class CommandHandler implements Runnable {
                         break;
                     }
                     case "emaillist": {
-     //                   System.out.println(jsonIn.getString("urlpath"));
+                        //                   System.out.println(jsonIn.getString("urlpath"));
                         returnEmails(jsonIn.getJsonArray("emailList"), jsonIn.getBoolean("showheaders"),
                                 StringEscapeUtils.unescapeHtml4(jsonIn.getString("urlpath")));
                         break;
@@ -239,6 +238,16 @@ public class CommandHandler implements Runnable {
                     }
                     case "saveSelected": {
                         String cText = "File Saved to " + fileUtils.saveSelected(jsonIn);
+                        this.out.println("HTTP/1.0 200 OK");
+                        this.out.println("Access-Control-Allow-Origin: *");
+                        this.out.println("Content-Length: " + cText.length());
+                        this.out.println("Content-Type: text/plain\n");
+                        this.out.println(cText);
+                        this.client.close();
+                        break;
+                    }
+                    case "saveJsonData": {
+                        String cText = "File Saved to " + fileUtils.saveJsonData(jsonIn);
                         this.out.println("HTTP/1.0 200 OK");
                         this.out.println("Access-Control-Allow-Origin: *");
                         this.out.println("Content-Length: " + cText.length());
@@ -305,7 +314,7 @@ public class CommandHandler implements Runnable {
                     }
                     case "clustersearch": {
                         ClusterSearch searcher = new ClusterSearch(baseDirectory);
-                        JsonObject terms = searcher.clusterSearch(jsonIn.getString("searchString"), jsonIn.getString("searchRange"));
+                        JsonObject terms = searcher.clusterSearch(jsonIn);
                         OutputStream sout = new ByteArrayOutputStream();
                         JsonWriterFactory jwf = Json.createWriterFactory(jMap);
                         JsonWriter jsonWriter = jwf.createWriter(sout);
@@ -322,7 +331,7 @@ public class CommandHandler implements Runnable {
                         this.out.println(outString);
                         this.client.close();
                         break;
-                     }
+                    }
                     default: {
                         String outString = "Invalid Request";
                         this.out.println("HTTP/1.0 404 Not Found");
@@ -618,18 +627,16 @@ public class CommandHandler implements Runnable {
                 Arrays.sort(terms, Collections.reverseOrder());
                 topUsers = terms;
                 reader.close();
-            } else {
-                if (!newSession) {
-                    for (int i = 0; i < exclude.size(); i++) {
-                        excludeSet.add(exclude.getString(i));
-                    }
+            } else if (!newSession) {
+                for (int i = 0; i < exclude.size(); i++) {
+                    excludeSet.add(exclude.getString(i));
+                }
 //                    Collections.addAll(excludeSet, exclude);
-                    for (String key : excludeSet) {
-                        try {
-                            topLinkEmails.remove(key);
-                        } catch (Exception e) {
-                            continue;
-                        }
+                for (String key : excludeSet) {
+                    try {
+                        topLinkEmails.remove(key);
+                    } catch (Exception e) {
+                        continue;
                     }
                 }
             }
@@ -733,99 +740,110 @@ public class CommandHandler implements Runnable {
                 }
             }
 //            System.out.println(selectedEmails.cardinality());
-            if (terms) {
-                SearchCollector emailsc = new SearchCollector();
-                emailsc.masterIndexPath = new File(baseDirectory, "index").toString();
-                emailsc.docIds = selectedEmails;
+            SearchCollector emailsc = new SearchCollector();
+            emailsc.masterIndexPath = new File(baseDirectory, "index").toString();
+            emailsc.docIds = selectedEmails;
 //                System.out.println(emailsc.docIds.cardinality());
-                ArrayList<ScTermData> rTerms = emailsc.getHighFreqTerms("noun", 500, new BitSet(),
-                        new CharArraySet(Version.LUCENE_40, 10, true));
+            String [] fieldList = new String[]{"noun", "verb"};
+            ArrayList<ScTermData> rTerms = emailsc.getExpansionTermsMultiField(fieldList, 200, new BitSet());
 //                System.out.println(rTerms.size());
-                for (ScTermData t : rTerms) {
+            for (ScTermData t : rTerms) {
 //                    outString += (t.term + "," + t.freq.toString() + "\n");
-                }
-            } else {
-                IndexReader reader;
-                reader = DirectoryReader.open(FSDirectory.open(new File(baseDirectory, "index")));
-                IndexSearcher searcher = new IndexSearcher(reader);
-                int nextId = 0;
-                Map<String, Pair<String, List<Pair<Integer, Long>>>> subjectMap = new HashMap<>();
-                while (nextId < reader.maxDoc()) {
-                    nextId = selectedEmails.nextSetBit(nextId);
-                    if (nextId == -1) {
-                        break;
-                    }
-                    Document doc = searcher.doc(nextId);
-                    String docSubject = doc.get("Subject");
-                    if (docSubject == null) {
-                        docSubject = doc.get("subject");
-                    }
-                    if (docSubject == null) {
-                        docSubject = "NO SUBJECT";
-                    }
-                    Long timeStamp = 0L;
-                    if (doc.get("timestamp") != null) {
-                        timeStamp = Long.parseLong(doc.get("timestamp"));
-                    }
-                    String subject = StringEscapeUtils.escapeJson(docSubject);
-                    String key = doc.get("subject_hash");
-                    if (key == null) {
-                        key = "0";
-                    }
-                    if (subjectMap.containsKey(key)) {
-                        Pair<String, List<Pair<Integer, Long>>> thisSubject = subjectMap.get(key);
-                        thisSubject.value.add(new Pair<>(nextId, timeStamp));
-                        subjectMap.put(key, thisSubject);
-                    } else {
-                        List<Pair<Integer, Long>> newList = new ArrayList<>();
-                        newList.add(new Pair<>(nextId, timeStamp));
-                        subjectMap.put(key, new Pair<>(subject, newList));
-                    }
-                    nextId++;
-                }
-                reader.close();
-                JsonBuilderFactory jFactory = Json.createBuilderFactory(jMap);
-                JsonArrayBuilder jSubjects = jFactory.createArrayBuilder();
-                JsonArrayBuilder jLinks = jFactory.createArrayBuilder();
-//                System.out.println(subjectMap.size());
-                for (String key : subjectMap.keySet()) {
-                    String subject = subjectMap.get(key).key;
-                    List<Pair<Integer, Long>> idList = subjectMap.get(key).value;
-                    Collections.sort(idList);
-                    JsonArrayBuilder jdocIdList = jFactory.createArrayBuilder();
-                    for (Pair<Integer, Long> id : idList) {
-                        jdocIdList.add(id.key);
-                    }
-                    jSubjects.add(jFactory.createObjectBuilder().add("subject", subject)
-                            .add("count", idList.size())
-                            .add("docidlist", jdocIdList.build()).build());
-//                System.out.println(new Date(key).toString() + ": " + weekMap.get(key));
-                }
-                for (String user : topLinkEmails.keySet()) {
-                    BitSet temp = (BitSet) selectedEmails.clone();
-                    temp.and(topLinkEmails.get(user).docIds);
-                    if (temp.cardinality() > 0) {
-                        jLinks.add(jFactory.createObjectBuilder().add("name", user)
-                                .add("links", getTopLinks(user)).build());
-                    }
-                }
-                OutputStream sout = new ByteArrayOutputStream();
-                JsonWriterFactory jwf = Json.createWriterFactory(jMap);
-                JsonWriter jsonWriter = jwf.createWriter(sout);
-                jsonWriter.writeObject(jFactory.createObjectBuilder().add("subjects", jSubjects.build())
-                        .add("links", jLinks).build());
-                jsonWriter.close();
-                String outString = sout.toString();
-                sout.close();
-//                System.out.println(outString);
-                this.out.println("HTTP/1.0 200 OK");
-                this.out.println("Access-Control-Allow-Origin: *");
-                this.out.println("Content-Length: " + outString.length());
-                this.out.println("Content-Type: text/plain");
-                this.out.println("Mime-Type: application/json");
-                this.out.println(outString);
-//                System.out.println("Returned: " + System.currentTimeMillis());
             }
+            IndexReader reader;
+            reader = DirectoryReader.open(FSDirectory.open(new File(baseDirectory, "index")));
+            IndexSearcher searcher = new IndexSearcher(reader);
+            int nextId = 0;
+            Map<String, Pair<String, List<Pair<Integer, Long>>>> subjectMap = new HashMap<>();
+            while (nextId < reader.maxDoc()) {
+                nextId = selectedEmails.nextSetBit(nextId);
+                if (nextId == -1) {
+                    break;
+                }
+                Document doc = searcher.doc(nextId);
+                String docSubject = doc.get("Subject");
+                if (docSubject == null) {
+                    docSubject = doc.get("subject");
+                }
+                if (docSubject == null) {
+                    docSubject = "NO SUBJECT";
+                }
+                Long timeStamp = 0L;
+                if (doc.get("timestamp") != null) {
+                    timeStamp = Long.parseLong(doc.get("timestamp"));
+                }
+                String subject = StringEscapeUtils.escapeJson(docSubject);
+                String key = doc.get("subject_hash");
+                if (key == null) {
+                    key = "0";
+                }
+                if (subjectMap.containsKey(key)) {
+                    Pair<String, List<Pair<Integer, Long>>> thisSubject = subjectMap.get(key);
+                    thisSubject.value.add(new Pair<>(nextId, timeStamp));
+                    subjectMap.put(key, thisSubject);
+                } else {
+                    List<Pair<Integer, Long>> newList = new ArrayList<>();
+                    newList.add(new Pair<>(nextId, timeStamp));
+                    subjectMap.put(key, new Pair<>(subject, newList));
+                }
+                nextId++;
+            }
+            reader.close();
+            JsonBuilderFactory jFactory = Json.createBuilderFactory(jMap);
+            JsonArrayBuilder jSubjects = jFactory.createArrayBuilder();
+            JsonArrayBuilder jLinks = jFactory.createArrayBuilder();
+//                System.out.println(subjectMap.size());
+            for (String key : subjectMap.keySet()) {
+                String subject = subjectMap.get(key).key;
+                List<Pair<Integer, Long>> idList = subjectMap.get(key).value;
+                Collections.sort(idList);
+                JsonArrayBuilder jdocIdList = jFactory.createArrayBuilder();
+                for (Pair<Integer, Long> id : idList) {
+                    jdocIdList.add(id.key);
+                }
+                jSubjects.add(jFactory.createObjectBuilder().add("subject", subject)
+                        .add("count", idList.size())
+                        .add("docidlist", jdocIdList.build()).build());
+//                System.out.println(new Date(key).toString() + ": " + weekMap.get(key));
+            }
+            for (String user : topLinkEmails.keySet()) {
+                BitSet temp = (BitSet) selectedEmails.clone();
+                temp.and(topLinkEmails.get(user).docIds);
+                if (temp.cardinality() > 0) {
+                    jLinks.add(jFactory.createObjectBuilder().add("name", user)
+                            .add("links", getTopLinks(user)).build());
+                }
+            }
+            JsonArrayBuilder jTerms = jFactory.createArrayBuilder();
+            long maxFreq = 0;
+            long minFreq = Long.MAX_VALUE;
+            for (ScTermData term : rTerms) {
+                maxFreq = (maxFreq > term.freq) ? maxFreq : term.freq;
+                minFreq = (minFreq < term.freq) ? minFreq : term.freq;
+                jTerms.add(jFactory.createObjectBuilder().add("term", StringEscapeUtils.escapeJson(term.term))
+                        .add("freq", term.freq)
+                        .add("group", term.group)
+                        .add("doccount", term.totalDocFreq).build());
+            }
+            OutputStream sout = new ByteArrayOutputStream();
+            JsonWriterFactory jwf = Json.createWriterFactory(jMap);
+            JsonWriter jsonWriter = jwf.createWriter(sout);
+            jsonWriter.writeObject(jFactory.createObjectBuilder().add("subjects", jSubjects.build())
+                    .add("links", jLinks)
+                    .add("results", jTerms.build())
+                    .add("maxFreq", maxFreq)
+                    .add("minFreq", minFreq).build());
+            jsonWriter.close();
+            String outString = sout.toString();
+            sout.close();
+//                System.out.println(outString);
+            this.out.println("HTTP/1.0 200 OK");
+            this.out.println("Access-Control-Allow-Origin: *");
+            this.out.println("Content-Length: " + outString.length());
+            this.out.println("Content-Type: text/plain");
+            this.out.println("Mime-Type: application/json");
+            this.out.println(outString);
+//                System.out.println("Returned: " + System.currentTimeMillis());
             this.client.close();
 //            System.out.println(outString);
         } catch (IOException ex) {
