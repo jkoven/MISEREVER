@@ -1091,6 +1091,8 @@ public class CommandHandler implements Runnable {
                 }
                 nextId++;
             }
+            String [] nfieldList = new String[]{"noun", "verb"};
+            ArrayList<ScTermData> rTerms = sc.getExpansionTermsMultiField(nfieldList, 200, new BitSet());
             reader.close();
             JsonBuilderFactory jFactory = Json.createBuilderFactory(jMap);
             JsonArrayBuilder jSubjects = jFactory.createArrayBuilder();
@@ -1116,11 +1118,25 @@ public class CommandHandler implements Runnable {
                             .add("links", getTopLinks(user)).build());
                 }
             }
+            JsonArrayBuilder jTerms = jFactory.createArrayBuilder();
+            long maxFreq = 0;
+            long minFreq = Long.MAX_VALUE;
+            for (ScTermData term : rTerms) {
+                maxFreq = (maxFreq > term.freq) ? maxFreq : term.freq;
+                minFreq = (minFreq < term.freq) ? minFreq : term.freq;
+                jTerms.add(jFactory.createObjectBuilder().add("term", StringEscapeUtils.escapeJson(term.term))
+                        .add("freq", term.freq)
+                        .add("group", term.group)
+                        .add("doccount", term.totalDocFreq).build());
+            }
             OutputStream sout = new ByteArrayOutputStream();
             JsonWriterFactory jwf = Json.createWriterFactory(jMap);
             JsonWriter jsonWriter = jwf.createWriter(sout);
-            jsonWriter.writeObject(jFactory.createObjectBuilder().add("subjects", jSubjects.build())
-                    .add("links", jLinks).build());
+             jsonWriter.writeObject(jFactory.createObjectBuilder().add("subjects", jSubjects.build())
+                    .add("links", jLinks)
+                    .add("results", jTerms.build())
+                    .add("maxFreq", maxFreq)
+                    .add("minFreq", minFreq).build());
             jsonWriter.close();
             String outString = sout.toString();
             sout.close();
