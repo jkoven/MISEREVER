@@ -61,8 +61,10 @@ public class SearchCollector extends Collector {
     public static double tfHigh = 0;
     public static double tfLow = Double.MAX_VALUE;
     public static CharArraySet stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
+    public static File sourceFile;
 
     public SearchCollector(int size) {
+        sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
         docIds = new BitSet(size);
         docBase = 0;
         indexMap = new HashMap<Integer, Integer>();
@@ -71,6 +73,7 @@ public class SearchCollector extends Collector {
     }
 
     public SearchCollector() {
+        sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
         docIds = new BitSet();
         docBase = 0;
         indexMap = new HashMap<Integer, Integer>();
@@ -79,6 +82,7 @@ public class SearchCollector extends Collector {
     }
 
     public SearchCollector(String sip, String mip) {
+        sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
         indexMap = new HashMap<Integer, Integer>();
         BufferedReader inFile = null;
         try {
@@ -87,7 +91,7 @@ public class SearchCollector extends Collector {
             subIndexPath = sip;
             masterIndexPath = mip;
             stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
-            File file = new File("./datafiles/stopwords_en.txt");
+            File file = new File(sourceFile.getParent(), "datafiles/stopwords_en.txt");
             inFile = new BufferedReader(new FileReader(file));
             String word;
             while ((word = inFile.readLine()) != null) {
@@ -142,7 +146,7 @@ public class SearchCollector extends Collector {
         HashMap<String, Integer> tempMap = new HashMap<String, Integer>();
         try {
             CharArraySet stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
-            File file = new File("./datafiles/stopwords_en.txt");
+            File file = new File(sourceFile.getParent(), "datafiles/stopwords_en.txt");
             BufferedReader inFile = new BufferedReader(new FileReader(file));
             String word;
             while ((word = inFile.readLine()) != null) {
@@ -243,7 +247,7 @@ public class SearchCollector extends Collector {
             BufferedReader inFile = null;
             stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
             try {
-                File file = new File("./datafiles/stopwords_en.txt");
+                File file = new File(sourceFile.getParent(), "datafiles/stopwords_en.txt");
                 inFile = new BufferedReader(new FileReader(file));
                 String word;
                 while ((word = inFile.readLine()) != null) {
@@ -339,7 +343,7 @@ public class SearchCollector extends Collector {
             BufferedReader inFile = null;
             stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
             try {
-                File file = new File("./datafiles/stopwords_en.txt");
+                File file = new File(sourceFile.getParent(), "datafiles/stopwords_en.txt");
                 inFile = new BufferedReader(new FileReader(file));
                 String word;
                 while ((word = inFile.readLine()) != null) {
@@ -433,7 +437,7 @@ public class SearchCollector extends Collector {
             BufferedReader inFile = null;
             stopWords = new CharArraySet(Version.LUCENE_40, 1000, true);
             try {
-                File file = new File("./datafiles/stopwords_en.txt");
+                File file = new File(sourceFile.getParent(), "datafiles/stopwords_en.txt");
                 inFile = new BufferedReader(new FileReader(file));
                 String word;
                 while ((word = inFile.readLine()) != null) {

@@ -11,6 +11,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
@@ -50,7 +51,14 @@ public class MISEREVER {
         int acceptCount = 5;
 
         try {
-            BufferedReader credReader = new BufferedReader(new FileReader(new File("./datafiles/basedirectory.txt")));
+            System.setOut(new PrintStream(new File("output-file.txt")));
+            System.setErr(new PrintStream(new File("error-file.txt")));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        File sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+        try {
+            BufferedReader credReader = new BufferedReader(new FileReader(new File(sourceFile.getParent(), "datafiles/basedirectory.txt")));
             baseDirectory = new File(passwordDecode(credReader.readLine().trim()));
             credReader.close();
         } catch (IOException ex) {
@@ -73,7 +81,7 @@ public class MISEREVER {
         bmessagePath = new File(baseDirectory, "messages").toString();
 
         try {
-            FileWriter credOut = new FileWriter(new File("./datafiles/basedirectory.txt"));
+            FileWriter credOut = new FileWriter(new File(sourceFile.getParent(), "datafiles/basedirectory.txt"));
             credOut.write(passwordEncode(baseDirectory.getParent()) + "\n");
             credOut.close();
         } catch (IOException e) {

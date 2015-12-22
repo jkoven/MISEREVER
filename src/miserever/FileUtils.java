@@ -59,12 +59,13 @@ public class FileUtils {
     }
 
     public void save(JsonObject jList) {
+        File sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
         OutputStream sout = null;
         try {
             String fileName = jList.getString("filename");
             HashMap jMap = new HashMap();
             jMap.put(JsonGenerator.PRETTY_PRINTING, true);
-            sout = new FileOutputStream(new File("./workingfiles/" + fileName));
+            sout = new FileOutputStream(new File(sourceFile.getParent(), "workingfiles/" + fileName));
             JsonWriterFactory jwf = Json.createWriterFactory(jMap);
             JsonWriter jsonWriter = jwf.createWriter(sout);
             jsonWriter.writeObject(jList);
@@ -82,7 +83,8 @@ public class FileUtils {
 
     public JsonObject getFileList() {
 
-        File dir = new File("./workingfiles/");
+        File sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
+        File dir = new File(sourceFile.getParent(), "workingfiles/");
         File[] filesList = dir.listFiles();
         JsonBuilderFactory jFactory = Json.createBuilderFactory(new HashMap<String, String>());
         JsonObjectBuilder jFileList = jFactory.createObjectBuilder();
@@ -101,10 +103,11 @@ public class FileUtils {
     }
 
     public JsonObject getFile(String fileName) {
+        File sourceFile = new File(MISEREVER.class.getProtectionDomain().getCodeSource().getLocation().getPath());
         JsonObject jsonIn = null;
         try {
             JsonReaderFactory rFactory = Json.createReaderFactory(new HashMap<String, String>());
-            JsonReader jr = rFactory.createReader(new FileReader(new File("./workingfiles/" + fileName)));
+            JsonReader jr = rFactory.createReader(new FileReader(new File(sourceFile.getParent(), "workingfiles/" + fileName)));
             jsonIn = jr.readObject();
             jr.close();
 
